@@ -43,6 +43,14 @@ FLAGFILE="/tmp/asg_codedeploy_flags-$DEPLOYMENT_GROUP_ID-$DEPLOYMENT_ID"
 # Handle ASG processes
 HANDLE_PROCS=false
 
+# Number of attempts to put instance into Standby
+ENTER_STANDBY_ATTEMPTS=3
+
+# The seed for the maximum number of seconds between sleep attempts. The sleep
+# time has the attempt number as a factor, so the maximum time between attempts
+# is: ENTER_STANDBY_ATTEMPTS * MAX_SLEEP_BETWEEN_STANDBY_ATTEMPTS
+MAX_SLEEP_BETWEEN_STANDBY_ATTEMPTS=15
+
 # Usage: get_instance_region
 #
 #   Writes to STDOUT the AWS region as known by the local instance.

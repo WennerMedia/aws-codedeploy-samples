@@ -38,15 +38,33 @@ if [ $? == 0 -a -n "${asg}" ]; then
         error_exit "CLI must be at least version ${MIN_CLI_X}.${MIN_CLI_Y}.${MIN_CLI_Z} to work with AutoScaling Standby"
     fi
 
-    msg "Attempting to put instance into Standby"
-    autoscaling_enter_standby $INSTANCE_ID "${asg}"
-    if [ $? != 0 ]; then
-        error_exit "Failed to move instance into standby"
-    else
-        msg "Instance is in standby"
-        finish_msg
-        exit 0
-    fi
+    # Setup a random value to sleep in the event of failure
+    RANDOM_SLEEP=$RANDOM
+    let "RANDOM_SLEEP %= $MAX_SLEEP_BETWEEN_STANDBY_ATTEMPTS"
+
+    STANDBY_COUNTER=1
+
+    # Retry entering standby to avoid race condition when deploying to 2 or more nodes at once.
+    while [ $STANDBY_COUNTER -le $ENTER_STANDBY_ATTEMPTS ]; do
+        msg "Attempt #$STANDBY_COUNTER to put instance into Standby"
+        autoscaling_enter_standby $INSTANCE_ID "${asg}"
+        if [ $? != 0 ]; then
+            let STANDBY_COUNTER=STANDBY_COUNTER+1
+
+            # Sleep to minimize odds of repeated failures
+            if [ $STANDBY_COUNTER -le $ENTER_STANDBY_ATTEMPTS ]; then
+              sleep $(( RANDOM_SLEEP * STANDBY_COUNTER ))
+            else
+              msg "Maximum number of attempts reached."
+            fi
+        else
+            msg "Instance is in standby after $STANDBY_COUNTER attempts"
+            finish_msg
+            exit 0
+        fi
+    done
+
+    error_exit "Failed to move instance into standby after $ENTER_STANDBY_ATTEMPTS attempts"
 fi
 
 msg "Instance is not part of an ASG, trying with ELB..."
